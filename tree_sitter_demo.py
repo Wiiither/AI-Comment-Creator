@@ -17,9 +17,10 @@ def run_command(command):
 if not os.path.exists("build"):
     os.makedirs("build")
 
-# 克隆 Swift 语言解析器仓库
+#  克隆 Swift 语言解析器仓库
+#  TODO: 这里的地址是固定的，需要找个方法或者配置去获取（或者直接克隆到工程里）
 if not os.path.exists("tree-sitter-swift"):
-    print("Cloning Swift parser repository...")
+    print("克隆语言解析器仓库...")
     run_command("git clone https://github.com/alex-pinkus/tree-sitter-swift.git")
 
 try:
@@ -47,9 +48,7 @@ parser.set_language(SWIFT_LANGUAGE)
 
 # Swift 测试代码
 code = """
-func hello() {
-    print("Hello, World!")
-}
+    let name = "hello"
 """
 
 tree = parser.parse(bytes(code, 'utf8'))
