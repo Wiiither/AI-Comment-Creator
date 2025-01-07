@@ -16,3 +16,6 @@ Tree-sitter 的主要特点包括：
 将 tree-sitter 的版本降级到 0.21.3 即可
 
 https://github.com/tree-sitter/py-tree-sitter/discussions/241
+
+灵感源自：
+https://github.com/Saik0s/SwiftDocAutomator
