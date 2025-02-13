@@ -2,8 +2,9 @@ import logging
 from typing import List
 import os
 
+import dotenv
 from langchain.chains.summarize import load_summarize_chain
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from tree_sitter import Node
@@ -12,13 +13,16 @@ from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMess
 from langchain.chains import LLMChain
 from langchain_core.output_parsers import StrOutputParser
 
+from langchain_deepseek import ChatDeepSeek
+
 from prompt_template import SWIFT_FUNCTION_DOC_INSTRUCTION, SWIFT_FUNCTION_DOC_PROMPT
+import dotenv
+
+dotenv.load('.env')
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-CHAT_MODEL_NAME = "llama3.2"
-MAX_TOKENS = 1024
 
 ####################################################################################################################
 REFINE_PROMPT_TMPL = (
@@ -48,36 +52,30 @@ documentation comment where every line starts with ///:"""
 PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
 ####################################################################################################################
 
-chat_model = ChatOllama(
-    model=CHAT_MODEL_NAME,
-    temperature=0,
-    timeout=180,
-    max_tokens=MAX_TOKENS
-)
+chat_model = ChatDeepSeek(model="deepseek-chat", temperature=0, max_tokens=None, max_retries=2)
 sum_chain = load_summarize_chain(chat_model, chain_type="refine", question_prompt=PROMPT, refine_prompt=REFINE_PROMPT)
 
+def wrap_triple_slash_comments(text: str, max_line_length=120):
+    lines = text.split("\n")
+    wrapped_lines = []
 
-# def wrap_triple_slash_comments(text: str, max_line_length=120):
-#     lines = text.split("\n")
-#     wrapped_lines = []
-#
-#     for line in lines:
-#         line = line.strip()
-#         if not line.startswith("///"):
-#             break
-#
-#         indent = len(line) - len(line.lstrip())
-#         words = line.split()
-#         current_line = words[0]
-#         for word in words[1:]:
-#             if len(current_line) + len(word) + 1 > max_line_length:
-#                 wrapped_lines.append(current_line)
-#                 current_line = " " * indent + "/// " + word
-#             else:
-#                 current_line += f" {word}"
-#         wrapped_lines.append(current_line)
-#
-#     return "\n".join(wrapped_lines)
+    for line in lines:
+        line = line.strip()
+        if not line.startswith("///"):
+            break
+
+        indent = len(line) - len(line.lstrip())
+        words = line.split()
+        current_line = words[0]
+        for word in words[1:]:
+            if len(current_line) + len(word) + 1 > max_line_length:
+                wrapped_lines.append(current_line)
+                current_line = " " * indent + "/// " + word
+            else:
+                current_line += f" {word}"
+        wrapped_lines.append(current_line)
+
+    return "\n".join(wrapped_lines)
 
 
 def generate_function_documentation(function_implementation: str) -> str:
@@ -90,7 +88,8 @@ def generate_function_documentation(function_implementation: str) -> str:
 
     chain = prompt | chat_model | StrOutputParser()
     result = chain.invoke({"function_implementation": function_implementation})
-    return result
+    print(result)
+    return ""
     # return wrap_triple_slash_comments(result)
 
 
@@ -99,9 +98,8 @@ def chain_summarize(text: str) -> str:
     try:
         docs = RecursiveCharacterTextSplitter().split_documents([Document(page_content=text)])
         result = sum_chain.invoke(docs)
-        if isinstance(result, dict):
-            result = result.get('output_text', '')
-        return result
+        return wrap_triple_slash_comments(result)
+        return ""
     except Exception as e:
         logger.error(f"Failed to summarize text:\n{text}")
         logger.error(e)
@@ -110,12 +108,12 @@ def chain_summarize(text: str) -> str:
 
 def generate_function_summary(function: Node) -> str:
     func_body = function.text.decode("utf8")
-    # if len(func_body.splitlines()) <= 1:
-    #     logger.info(f"Function/property body is too short, skipping:\n{func_body}")
-    #     return ""
+    if len(func_body.splitlines()) <= 1:
+        logger.info(f"Function/property body is too short, skipping:\n{func_body}")
+        return ""
 
     try:
-        return generate_function_documentation(func_body)
+        return wrap_triple_slash_comments(generate_function_documentation(func_body))
     except Exception as e:
         logger.error(f"Failed to generate documentation for function:\n{func_body}")
         logger.error(e)
@@ -137,24 +135,16 @@ def generate_class_body_summary(class_body: str) -> str:
 if __name__ == "__main__":
     # Example usage
     swift_function = """
-    @usableFromInline
-    func typeName(_ type: Any.Type) -> String {
-    var name = _typeName(type, qualified: true)
-    if let index = name.firstIndex(of: ".") {
-        name.removeSubrange(...index)
-    }
-    let sanitizedName =
-        name
-        .replacingOccurrences(
-        of: #"<.+>|\(unknown context at \$[[:xdigit:]]+\)\."#,
-        with: "",
-        options: .regularExpression
-        )
-    return sanitizedName
-    }
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "热点排行榜".home.localized
+        label.font = .aic_semiboldFont(withSize: 15)
+        label.textColor = .baseTheme.current.cellTitleColor
+        return label
+    }()
     """
 
-    documentation_comment = chain_summarize(swift_function)
-    print(documentation_comment)
+    # documentation_comment = chain_summarize(swift_function)
+    # print(documentation_comment)
     documentation_comment = generate_function_documentation(swift_function)
     print(documentation_comment)

@@ -5,8 +5,7 @@ import subprocess
 def run_command(command):
     """执行命令并打印输出"""
     try:
-        result = subprocess.run(command, shell=True, check=True, 
-                              capture_output=True, text=True)
+        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
         print(f"Command output: {result.stdout}")
     except subprocess.CalledProcessError as e:
         print(f"Error executing command: {e}")

@@ -82,9 +82,9 @@ PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
 ####################################################################################################################
 
 chat_model = ChatOpenAI(
-    model_name=CHAT_MODEL_NAME, 
-    temperature=0, 
-    request_timeout=180, 
+    model_name=CHAT_MODEL_NAME,
+    temperature=0,
+    request_timeout=180,
     max_tokens=MAX_TOKENS
 )
 sum_chain = load_summarize_chain(chat_model, chain_type="refine", question_prompt=PROMPT, refine_prompt=REFINE_PROMPT)
@@ -120,7 +120,7 @@ def generate_function_documentation(function_implementation: str) -> str:
             HumanMessagePromptTemplate.from_template(FUNCTION_DOC_PROMPT),
         ]
     )
-    
+
     chain = prompt | chat_model | StrOutputParser()
     result = chain.invoke({"function_implementation": function_implementation})
     return wrap_triple_slash_comments(result)
